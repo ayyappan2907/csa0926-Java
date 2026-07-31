@@ -1,0 +1,34 @@
+import java.util.Scanner;
+
+class main{
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.print("Enter first string: ");
+        String str1 = sc.nextLine();
+        System.out.print("Enter second string: ");
+        String str2 = sc.nextLine();
+        System.out.println("\nUsing equals():");
+        if (str1.equals(str2)) {
+            System.out.println("Both strings are exactly equal.");
+        } else {
+            System.out.println("Strings are not exactly equal.");
+        }
+              System.out.println("\nUsing equalsIgnoreCase():");
+        if (str1.equalsIgnoreCase(str2)) {
+            System.out.println("Strings are equal (ignoring case).");
+        } else {
+            System.out.println("Strings are not equal even after ignoring case.");
+        }
+        System.out.println("\nUsing compareTo():");
+        int result = str1.compareTo(str2);
+        if (result == 0) {
+            System.out.println("Both strings are lexicographically equal.");
+        } else if (result > 0) {
+            System.out.println("First string is lexicographically greater.");
+        } else {
+            System.out.println("First string is lexicographically smaller.");
+        }
+        System.out.println("compareTo() returned: " + result);
+
+    }
+}
