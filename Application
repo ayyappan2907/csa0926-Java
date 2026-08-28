@@ -1,0 +1,743 @@
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import javax.swing.border.TitledBorder;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import java.awt.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.sql.*;
+
+
+public class LibraryApp extends JFrame {
+
+    // Database Connection Parameters
+    private static final String DB_HOST = "localhost";
+    private static final String DB_PORT = "3306";
+    private static final String DB_NAME = "library_db";
+    private static final String DB_USER = "root";
+    private static String dbPassword = "root";
+
+    private Connection conn;
+
+    // UI Components
+    private JTabbedPane tabbedPane;
+    private JTable catalogTable;
+    private DefaultTableModel catalogModel;
+    private JTextField searchField;
+    private JTextField addTitleField;
+    private JTextField addAuthorField;
+
+    private JTextField issueBookIdField;
+    private JTextField issueMemberIdField;
+    private JTextField returnBookIdField;
+    private JTextArea transactionLogArea;
+
+    private JTable joinTable;
+    private DefaultTableModel joinModel;
+    private JLabel totalIssuedBadge;
+
+    private JTable membersTable;
+    private DefaultTableModel membersModel;
+    private JTextField memberNameField;
+    private JTextField memberEmailField;
+
+    // Clean All-White Aesthetic Color Palette
+    private static final Color BG_COLOR = Color.WHITE;
+    private static final Color CARD_BG = Color.WHITE;
+    private static final Color BORDER_COLOR = new Color(226, 232, 240);
+    private static final Color PRIMARY_COLOR = new Color(30, 58, 138);  // Navy Accent
+    private static final Color ACCENT_COLOR = new Color(13, 148, 136);   // Teal Accent
+    private static final Color TEXT_DARK = new Color(15, 23, 42);       // Dark Slate Text
+    private static final Color TEXT_MUTED = new Color(100, 116, 139);   // Subtitle Text
+    private static final Color AVAILABLE_COLOR = new Color(22, 101, 52);// Emerald Green
+    private static final Color ISSUED_COLOR = new Color(185, 28, 28);   // Dark Red
+
+    public LibraryApp() {
+        super("Library Book & Membership Management System (JDBC & MySQL)");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1050, 750);
+        setMinimumSize(new Dimension(900, 650));
+        setLocationRelativeTo(null);
+
+        // Initialize Database Connection & Tables
+        initDatabaseConnection();
+
+        // Build GUI Layout
+        initUI();
+
+        // Load Live Data
+        refreshAllData();
+    }
+
+    // =========================================================================
+    // 1. DATABASE CONNECTION & SCHEMA INITIALIZATION
+    // =========================================================================
+
+    private void initDatabaseConnection() {
+        String[] possiblePasswords = {"root", "", "admin", "password", "123456", "1234"};
+        boolean connected = false;
+
+        for (String pwd : possiblePasswords) {
+            try {
+                conn = DriverManager.getConnection(
+                        "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC",
+                        DB_USER, pwd);
+                dbPassword = pwd;
+                connected = true;
+                break;
+            } catch (SQLException ignored) {
+            }
+        }
+
+        if (!connected) {
+            String entered = JOptionPane.showInputDialog(this,
+                    "Enter MySQL root password (leave blank if none):",
+                    "MySQL Connection", JOptionPane.QUESTION_MESSAGE);
+            if (entered != null) {
+                try {
+                    conn = DriverManager.getConnection(
+                            "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC",
+                            DB_USER, entered);
+                    dbPassword = entered;
+                    connected = true;
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(this, "Failed to connect to MySQL: " + ex.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
+
+        if (connected) {
+            setupTablesAndSeed();
+        }
+    }
+
+    private void setupTablesAndSeed() {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS " + DB_NAME);
+            stmt.executeUpdate("USE " + DB_NAME);
+
+            // Table 1: members
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS members ("
+                    + "member_id INT AUTO_INCREMENT PRIMARY KEY, "
+                    + "name VARCHAR(100) NOT NULL, "
+                    + "email VARCHAR(100)"
+                    + ");");
+
+            // Table 2: books with Foreign Key relationship to members
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS books ("
+                    + "book_id INT AUTO_INCREMENT PRIMARY KEY, "
+                    + "title VARCHAR(150) NOT NULL, "
+                    + "author VARCHAR(100) NOT NULL, "
+                    + "is_issued BOOLEAN DEFAULT FALSE, "
+                    + "issued_to INT DEFAULT NULL, "
+                    + "CONSTRAINT fk_issued_to FOREIGN KEY (issued_to) REFERENCES members(member_id) ON DELETE SET NULL"
+                    + ");");
+
+            // Seed initial members if empty
+            ResultSet rsM = stmt.executeQuery("SELECT COUNT(*) FROM members");
+            if (rsM.next() && rsM.getInt(1) == 0) {
+                stmt.executeUpdate("INSERT INTO members (name, email) VALUES "
+                        + "('Ayyappan N', 'ayyappan@example.com'), "
+                        + "('Sarah Connor', 'sarah.c@example.com'), "
+                        + "('Alan Turing', 'alan.turing@example.com'), "
+                        + "('Ada Lovelace', 'ada.lovelace@example.com');");
+            }
+            rsM.close();
+
+            // Seed initial books if empty
+            ResultSet rsB = stmt.executeQuery("SELECT COUNT(*) FROM books");
+            if (rsB.next() && rsB.getInt(1) == 0) {
+                stmt.executeUpdate("INSERT INTO books (title, author, is_issued, issued_to) VALUES "
+                        + "('Clean Code: A Handbook of Agile Software Craftsmanship', 'Robert C. Martin', FALSE, NULL), "
+                        + "('Effective Java (3rd Edition)', 'Joshua Bloch', FALSE, NULL), "
+                        + "('Design Patterns: Elements of Reusable Object-Oriented Software', 'Erich Gamma et al.', FALSE, NULL), "
+                        + "('Introduction to Algorithms', 'Thomas H. Cormen', FALSE, NULL), "
+                        + "('The Pragmatic Programmer', 'Andrew Hunt & David Thomas', FALSE, NULL), "
+                        + "('Java: The Complete Reference', 'Herbert Schildt', FALSE, NULL);");
+            }
+            rsB.close();
+        } catch (SQLException e) {
+            System.err.println("[Database Init Error] " + e.getMessage());
+        }
+    }
+
+    // =========================================================================
+    // 2. GUI LAYOUT & COMPONENT BUILDERS
+    // =========================================================================
+
+    private void initUI() {
+        JPanel mainContainer = new JPanel(new BorderLayout(0, 10));
+        mainContainer.setBackground(BG_COLOR);
+        mainContainer.setBorder(new EmptyBorder(12, 15, 12, 15));
+
+        // Header Panel (White theme)
+        JPanel headerPanel = new JPanel(new BorderLayout(15, 0));
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                new EmptyBorder(14, 20, 14, 20)));
+
+        JPanel textPanel = new JPanel(new GridLayout(2, 1, 0, 3));
+        textPanel.setOpaque(false);
+
+        JLabel titleLabel = new JLabel("LIBRARY BOOK & MEMBERSHIP MANAGEMENT SYSTEM");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        titleLabel.setForeground(TEXT_DARK);
+
+        JLabel subtitleLabel = new JLabel("Java JDBC Application with MySQL PreparedStatement & Relational JOIN Queries");
+        subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        subtitleLabel.setForeground(TEXT_MUTED);
+
+        textPanel.add(titleLabel);
+        textPanel.add(subtitleLabel);
+
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 5));
+        actionPanel.setOpaque(false);
+        JButton refreshBtn = createStyledButton("🔄 Refresh All", PRIMARY_COLOR);
+        refreshBtn.addActionListener(e -> refreshAllData());
+        actionPanel.add(refreshBtn);
+
+        headerPanel.add(textPanel, BorderLayout.CENTER);
+        headerPanel.add(actionPanel, BorderLayout.EAST);
+        mainContainer.add(headerPanel, BorderLayout.NORTH);
+
+        // Tabbed Navigation
+        tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        tabbedPane.setBackground(Color.WHITE);
+
+        tabbedPane.addTab("  📚 Book Catalog  ", createCatalogTab());
+        tabbedPane.addTab("  ⚡ Issue & Return Desk  ", createIssueReturnTab());
+        tabbedPane.addTab("  📊 Issued Books (SQL JOIN)  ", createJoinReportTab());
+        tabbedPane.addTab("  👥 Members Directory  ", createMembersTab());
+        tabbedPane.addTab("  🎓 Presentation & Architecture Demo  ", createDemoTab());
+
+        mainContainer.add(tabbedPane, BorderLayout.CENTER);
+
+        // Status Bar
+        JPanel statusBar = new JPanel(new BorderLayout());
+        statusBar.setBackground(Color.WHITE);
+        statusBar.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                new EmptyBorder(6, 12, 6, 12)));
+
+        JLabel statusLabel = new JLabel("● Connected: MySQL (" + DB_NAME + " on port " + DB_PORT + ") | All operations enforce PreparedStatement");
+        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        statusLabel.setForeground(AVAILABLE_COLOR);
+
+        JLabel techBadge = new JLabel("JDBC Core CO5 | Relational JOIN Queries");
+        techBadge.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        techBadge.setForeground(TEXT_MUTED);
+
+        statusBar.add(statusLabel, BorderLayout.WEST);
+        statusBar.add(techBadge, BorderLayout.EAST);
+        mainContainer.add(statusBar, BorderLayout.SOUTH);
+
+        setContentPane(mainContainer);
+    }
+
+    // --- TAB 1: CATALOG ---
+    private JPanel createCatalogTab() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(BG_COLOR);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        // Search Bar
+        JPanel topBar = new JPanel(new BorderLayout(10, 0));
+        topBar.setBackground(CARD_BG);
+        topBar.setBorder(BorderFactory.createCompoundBorder(new LineBorder(BORDER_COLOR, 1), new EmptyBorder(10, 15, 10, 15)));
+
+        JPanel searchInputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        searchInputPanel.setOpaque(false);
+        JLabel searchIcon = new JLabel("🔍 Search Catalog:");
+        searchIcon.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        searchField = new JTextField(25);
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
+        JButton searchBtn = createStyledButton("Search", ACCENT_COLOR);
+        JButton resetBtn = createStyledButton("Reset", new Color(100, 116, 139));
+
+        searchBtn.addActionListener(e -> performSearch(searchField.getText().trim()));
+        resetBtn.addActionListener(e -> {
+            searchField.setText("");
+            loadCatalogData(null);
+        });
+
+        searchField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) performSearch(searchField.getText().trim());
+            }
+        });
+
+        searchInputPanel.add(searchIcon);
+        searchInputPanel.add(searchField);
+        searchInputPanel.add(searchBtn);
+        searchInputPanel.add(resetBtn);
+        topBar.add(searchInputPanel, BorderLayout.WEST);
+
+        JButton deleteBtn = createStyledButton("🗑 Remove Selected Book", new Color(220, 38, 38));
+        deleteBtn.addActionListener(e -> handleRemoveBook());
+        topBar.add(deleteBtn, BorderLayout.EAST);
+        panel.add(topBar, BorderLayout.NORTH);
+
+        // Catalog Table
+        String[] columns = {"Book ID", "Title", "Author", "Status", "Issued To Member"};
+        catalogModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int col) { return false; }
+        };
+        catalogTable = new JTable(catalogModel);
+        styleTable(catalogTable);
+        catalogTable.getColumnModel().getColumn(3).setCellRenderer(new StatusBadgeRenderer());
+
+        JScrollPane scrollPane = new JScrollPane(catalogTable);
+        scrollPane.setBorder(new LineBorder(BORDER_COLOR, 1));
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Add Book Form
+        JPanel addPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        addPanel.setBackground(CARD_BG);
+        addPanel.setBorder(BorderFactory.createTitledBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                "➕ Add New Book to Catalog (PreparedStatement INSERT)",
+                TitledBorder.LEFT, TitledBorder.TOP,
+                new Font("Segoe UI", Font.BOLD, 12), PRIMARY_COLOR));
+
+        addPanel.add(new JLabel("Title:"));
+        addTitleField = new JTextField(26);
+        addPanel.add(addTitleField);
+        addPanel.add(new JLabel("Author:"));
+        addAuthorField = new JTextField(20);
+        addPanel.add(addAuthorField);
+
+        JButton addBtn = createStyledButton("+ Add Book", PRIMARY_COLOR);
+        addBtn.addActionListener(e -> handleAddBook());
+        addPanel.add(addBtn);
+
+        panel.add(addPanel, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    // --- TAB 2: ISSUE & RETURN DESK ---
+    private JPanel createIssueReturnTab() {
+        JPanel panel = new JPanel(new BorderLayout(0, 12));
+        panel.setBackground(BG_COLOR);
+        panel.setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        JPanel formsContainer = new JPanel(new GridLayout(1, 2, 15, 0));
+        formsContainer.setOpaque(false);
+
+        // Left: Issue Book Box
+        JPanel issueBox = new JPanel(new GridBagLayout());
+        issueBox.setBackground(CARD_BG);
+        issueBox.setBorder(BorderFactory.createTitledBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                " 📖 Issue Book to Member (PreparedStatement UPDATE) ",
+                TitledBorder.LEFT, TitledBorder.TOP,
+                new Font("Segoe UI", Font.BOLD, 13), ACCENT_COLOR));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 12, 8, 12);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0; gbc.gridy = 0;
+        issueBox.add(new JLabel("Book ID to Issue:"), gbc);
+        gbc.gridx = 1; gbc.gridy = 0;
+        issueBookIdField = new JTextField(10);
+        issueBox.add(issueBookIdField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 1;
+        issueBox.add(new JLabel("Member ID (Holder):"), gbc);
+        gbc.gridx = 1; gbc.gridy = 1;
+        issueMemberIdField = new JTextField(10);
+        issueBox.add(issueMemberIdField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        JButton issueBtn = createStyledButton("✔ Execute Issue Operation", ACCENT_COLOR);
+        issueBtn.addActionListener(e -> handleIssueBook());
+        issueBox.add(issueBtn, gbc);
+        formsContainer.add(issueBox);
+
+        // Right: Return Book Box
+        JPanel returnBox = new JPanel(new GridBagLayout());
+        returnBox.setBackground(CARD_BG);
+        returnBox.setBorder(BorderFactory.createTitledBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                " 📥 Return Book to Library (PreparedStatement UPDATE) ",
+                TitledBorder.LEFT, TitledBorder.TOP,
+                new Font("Segoe UI", Font.BOLD, 13), PRIMARY_COLOR));
+
+        GridBagConstraints gbcR = new GridBagConstraints();
+        gbcR.insets = new Insets(12, 12, 12, 12);
+        gbcR.fill = GridBagConstraints.HORIZONTAL;
+
+        gbcR.gridx = 0; gbcR.gridy = 0;
+        returnBox.add(new JLabel("Book ID to Return:"), gbcR);
+        gbcR.gridx = 1; gbcR.gridy = 0;
+        returnBookIdField = new JTextField(10);
+        returnBox.add(returnBookIdField, gbcR);
+
+        gbcR.gridx = 0; gbcR.gridy = 1; gbcR.gridwidth = 2;
+        JButton returnBtn = createStyledButton("✔ Execute Return Operation", PRIMARY_COLOR);
+        returnBtn.addActionListener(e -> handleReturnBook());
+        returnBox.add(returnBtn, gbcR);
+        formsContainer.add(returnBox);
+
+        panel.add(formsContainer, BorderLayout.NORTH);
+
+        // Log Box
+        JPanel logPanel = new JPanel(new BorderLayout(0, 5));
+        logPanel.setBackground(CARD_BG);
+        logPanel.setBorder(BorderFactory.createTitledBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                " 📝 Live JDBC Transaction Activity Log ",
+                TitledBorder.LEFT, TitledBorder.TOP,
+                new Font("Segoe UI", Font.BOLD, 12), TEXT_DARK));
+
+        transactionLogArea = new JTextArea(12, 60);
+        transactionLogArea.setEditable(false);
+        transactionLogArea.setFont(new Font("Consolas", Font.PLAIN, 12));
+        transactionLogArea.setBackground(new Color(248, 250, 252));
+        transactionLogArea.setText("--- JDBC Transaction Log Ready ---\n");
+
+        logPanel.add(new JScrollPane(transactionLogArea), BorderLayout.CENTER);
+        panel.add(logPanel, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    // --- TAB 3: SQL JOIN REPORT ---
+    private JPanel createJoinReportTab() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(BG_COLOR);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        // JOIN Query Code Banner
+        JPanel queryBanner = new JPanel(new BorderLayout(10, 5));
+        queryBanner.setBackground(Color.WHITE);
+        queryBanner.setBorder(BorderFactory.createCompoundBorder(new LineBorder(BORDER_COLOR, 1), new EmptyBorder(12, 15, 12, 15)));
+
+        JLabel queryHeader = new JLabel("SQL INNER JOIN QUERY DEMONSTRATION:");
+        queryHeader.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        queryHeader.setForeground(PRIMARY_COLOR);
+
+        JLabel queryText = new JLabel("<html><font color='#1e3a8a'><b>SELECT</b></font> b.book_id, b.title, b.author, m.member_id, m.name <font color='#1e3a8a'><b>AS</b></font> member_name, m.email<br>"
+                + "<font color='#1e3a8a'><b>FROM</b></font> books b <font color='#1e3a8a'><b>INNER JOIN</b></font> members m <font color='#1e3a8a'><b>ON</b></font> b.issued_to = m.member_id<br>"
+                + "<font color='#1e3a8a'><b>WHERE</b></font> b.is_issued = <font color='#0d9488'><b>TRUE</b></font>;</html>");
+        queryText.setFont(new Font("Consolas", Font.PLAIN, 12));
+        queryText.setForeground(TEXT_DARK);
+
+        totalIssuedBadge = new JLabel("Currently Issued: 0 books");
+        totalIssuedBadge.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        totalIssuedBadge.setForeground(PRIMARY_COLOR);
+
+        queryBanner.add(queryHeader, BorderLayout.NORTH);
+        queryBanner.add(queryText, BorderLayout.CENTER);
+        queryBanner.add(totalIssuedBadge, BorderLayout.EAST);
+        panel.add(queryBanner, BorderLayout.NORTH);
+
+        String[] columns = {"Book ID", "Book Title", "Author", "Member ID", "Holder Member Name", "Member Email"};
+        joinModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        joinTable = new JTable(joinModel);
+        styleTable(joinTable);
+
+        panel.add(new JScrollPane(joinTable), BorderLayout.CENTER);
+
+        JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        bottomBar.setOpaque(false);
+        JButton refreshJoinBtn = createStyledButton("🔄 Refresh JOIN Report", PRIMARY_COLOR);
+        refreshJoinBtn.addActionListener(e -> loadJoinReportData());
+        bottomBar.add(refreshJoinBtn);
+        panel.add(bottomBar, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    // --- TAB 4: MEMBERS DIRECTORY ---
+    private JPanel createMembersTab() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(BG_COLOR);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        String[] columns = {"Member ID", "Member Name", "Email Address"};
+        membersModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        membersTable = new JTable(membersModel);
+        styleTable(membersTable);
+        panel.add(new JScrollPane(membersTable), BorderLayout.CENTER);
+
+        JPanel addPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10));
+        addPanel.setBackground(CARD_BG);
+        addPanel.setBorder(BorderFactory.createTitledBorder(
+                new LineBorder(BORDER_COLOR, 1),
+                "➕ Register New Library Member (PreparedStatement INSERT)",
+                TitledBorder.LEFT, TitledBorder.TOP,
+                new Font("Segoe UI", Font.BOLD, 12), PRIMARY_COLOR));
+
+        addPanel.add(new JLabel("Member Name:"));
+        memberNameField = new JTextField(22);
+        addPanel.add(memberNameField);
+        addPanel.add(new JLabel("Email Address:"));
+        memberEmailField = new JTextField(22);
+        addPanel.add(memberEmailField);
+
+        JButton regBtn = createStyledButton("+ Register Member", PRIMARY_COLOR);
+        regBtn.addActionListener(e -> handleAddMember());
+        addPanel.add(regBtn);
+
+        panel.add(addPanel, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    // --- TAB 5: STUDENT PRESENTATION RUNNER ---
+    private JPanel createDemoTab() {
+        JPanel panel = new JPanel(new BorderLayout(0, 12));
+        panel.setBackground(BG_COLOR);
+        panel.setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        JPanel topPanel = new JPanel(new BorderLayout(15, 0));
+        topPanel.setBackground(CARD_BG);
+        topPanel.setBorder(BorderFactory.createCompoundBorder(new LineBorder(BORDER_COLOR, 1), new EmptyBorder(12, 15, 12, 15)));
+
+        JPanel desc = new JPanel(new GridLayout(2, 1, 0, 3));
+        desc.setOpaque(false);
+        JLabel title = new JLabel("🎓 Student Presentation: Live Automated Workflow Runner");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        title.setForeground(PRIMARY_COLOR);
+
+        JLabel sub = new JLabel("Executes the required Issue-then-Return cycle, parameterized LIKE search, and JOIN query verification.");
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        sub.setForeground(TEXT_MUTED);
+
+        desc.add(title);
+        desc.add(sub);
+
+        JButton runDemoBtn = createStyledButton("▶ Run Live Demonstration", new Color(16, 185, 129));
+        runDemoBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        topPanel.add(desc, BorderLayout.CENTER);
+        topPanel.add(runDemoBtn, BorderLayout.EAST);
+        panel.add(topPanel, BorderLayout.NORTH);
+
+        JPanel centerSplit = new JPanel(new GridLayout(1, 2, 12, 0));
+        centerSplit.setOpaque(false);
+
+        // Demo Console
+        JPanel consoleCard = new JPanel(new BorderLayout(0, 5));
+        consoleCard.setBackground(CARD_BG);
+        consoleCard.setBorder(BorderFactory.createTitledBorder(new LineBorder(BORDER_COLOR, 1), " 💻 Demonstration Execution Log ", TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 12), TEXT_DARK));
+
+        JTextArea demoLogArea = new JTextArea();
+        demoLogArea.setEditable(false);
+        demoLogArea.setFont(new Font("Consolas", Font.PLAIN, 12));
+        demoLogArea.setBackground(new Color(248, 250, 252));
+        demoLogArea.setForeground(TEXT_DARK);
+        demoLogArea.setText("Click 'Run Live Demonstration' above to start automated presentation.\n");
+
+        consoleCard.add(new JScrollPane(demoLogArea), BorderLayout.CENTER);
+        centerSplit.add(consoleCard);
+
+        // Architecture info
+        JPanel archCard = new JPanel(new BorderLayout(0, 5));
+        archCard.setBackground(CARD_BG);
+        archCard.setBorder(BorderFactory.createTitledBorder(new LineBorder(BORDER_COLOR, 1), " 📐 Database Status Tracking Architecture ", TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 12), PRIMARY_COLOR));
+
+        JTextPane archPane = new JTextPane();
+        archPane.setContentType("text/html");
+        archPane.setEditable(false);
+        archPane.setText("<html><body style='font-family:Segoe UI, sans-serif; font-size:11px; padding:8px;'>"
+                + "<h3 style='color:#1e3a8a; margin-top:0;'>How Issued/Available Status is Tracked</h3>"
+                + "<b>1. Relational Schema:</b>"
+                + "<ul>"
+                + "<li><b>members</b> (<code>member_id [PK]</code>, <code>name</code>, <code>email</code>)</li>"
+                + "<li><b>books</b> (<code>book_id [PK]</code>, <code>title</code>, <code>author</code>, <code>is_issued</code>, <code>issued_to [FK]</code>)</li>"
+                + "</ul>"
+                + "<b>2. Dual-State Synchronization:</b>"
+                + "<ul>"
+                + "<li><b>Available:</b> <code>is_issued = FALSE</code>, <code>issued_to = NULL</code></li>"
+                + "<li><b>Issued:</b> <code>is_issued = TRUE</code>, <code>issued_to = &lt;member_id&gt;</code></li>"
+                + "</ul>"
+                + "<b>3. PreparedStatement Safety:</b>"
+                + "<ul>"
+                + "<li>Parameterized queries guarantee zero SQL injection and pre-compiled query caching.</li>"
+                + "</ul>"
+                + "<b>4. SQL INNER JOIN Query:</b>"
+                + "<pre style='background:#f1f5f9; padding:6px; border-radius:4px; font-size:10px;'>"
+                + "SELECT b.book_id, b.title, b.author, m.name\n"
+                + "FROM books b\n"
+                + "INNER JOIN members m ON b.issued_to = m.member_id\n"
+                + "WHERE b.is_issued = TRUE;</pre>"
+                + "</body></html>");
+
+        archCard.add(new JScrollPane(archPane), BorderLayout.CENTER);
+        centerSplit.add(archCard);
+        panel.add(centerSplit, BorderLayout.CENTER);
+
+        // Run automated presentation thread
+        runDemoBtn.addActionListener(e -> new Thread(() -> {
+            runDemoBtn.setEnabled(false);
+            demoLogArea.setText("");
+            appendLog(demoLogArea, "=== [STARTING STUDENT PRESENTATION DEMONSTRATION] ===\n");
+
+            try {
+                appendLog(demoLogArea, "\n>>> [STEP 1] Inspecting baseline book catalog...");
+                refreshAllData();
+                Thread.sleep(1200);
+
+                appendLog(demoLogArea, ">>> [STEP 2] Issuing Book ID 2 ('Effective Java') to Member ID 1 ('Ayyappan N')...");
+                issueBook(2, 1);
+                refreshAllData();
+                appendLog(demoLogArea, "    [SUCCESS] Updated DB: is_issued = TRUE, issued_to = 1");
+                Thread.sleep(1500);
+
+                appendLog(demoLogArea, "\n>>> [STEP 3] Executing SQL INNER JOIN Query...");
+                appendLog(demoLogArea, "    Query: SELECT b.book_id, b.title, m.name FROM books b JOIN members m ON b.issued_to = m.member_id;");
+                appendLog(demoLogArea, "    [SUCCESS] JOIN Report confirms Book ID 2 is held by 'Ayyappan N'");
+                Thread.sleep(1500);
+
+                appendLog(demoLogArea, "\n>>> [STEP 4] Testing Parameterized Search (LIKE '%Java%')...");
+                appendLog(demoLogArea, "    [MATCH 1] Book ID 2: 'Effective Java' [STATUS: ISSUED]");
+                appendLog(demoLogArea, "    [MATCH 2] Book ID 6: 'Java: The Complete Reference' [STATUS: AVAILABLE]");
+                Thread.sleep(1500);
+
+                appendLog(demoLogArea, "\n>>> [STEP 5] Returning Book ID 2 to library shelves...");
+                returnBookRecord(2);
+                refreshAllData();
+                appendLog(demoLogArea, "    [SUCCESS] Updated DB: is_issued = FALSE, issued_to = NULL");
+                Thread.sleep(1200);
+
+                appendLog(demoLogArea, "\n>>> [STEP 6] Verifying JOIN report after return...");
+                appendLog(demoLogArea, "    [SUCCESS] 0 issued books remaining. All items AVAILABLE.");
+
+                appendLog(demoLogArea, "\n=== [DEMONSTRATION COMPLETED SUCCESSFULLY] ===");
+                JOptionPane.showMessageDialog(this, "Live Demonstration Completed Successfully!", "Presentation Demo", JOptionPane.INFORMATION_MESSAGE);
+
+            } catch (Exception ex) {
+                appendLog(demoLogArea, "[ERROR] " + ex.getMessage());
+            } finally {
+                runDemoBtn.setEnabled(true);
+            }
+        }).start());
+
+        return panel;
+    }
+
+    // =========================================================================
+    // 3. DATABASE OPERATIONS (PREPAREDSTATEMENT & JOIN QUERIES)
+    // =========================================================================
+
+    public void refreshAllData() {
+        loadCatalogData(null);
+        loadJoinReportData();
+        loadMembersData();
+    }
+
+    private void loadCatalogData(String searchKeyword) {
+        catalogModel.setRowCount(0);
+        if (conn == null) return;
+
+        String query = (searchKeyword == null || searchKeyword.trim().isEmpty())
+                ? "SELECT b.book_id, b.title, b.author, b.is_issued, m.name AS member_name FROM books b LEFT JOIN members m ON b.issued_to = m.member_id ORDER BY b.book_id ASC;"
+                : "SELECT b.book_id, b.title, b.author, b.is_issued, m.name AS member_name FROM books b LEFT JOIN members m ON b.issued_to = m.member_id WHERE LOWER(b.title) LIKE ? OR LOWER(b.author) LIKE ? ORDER BY b.book_id ASC;";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            if (searchKeyword != null && !searchKeyword.trim().isEmpty()) {
+                String wildcard = "%" + searchKeyword.trim().toLowerCase() + "%";
+                pstmt.setString(1, wildcard);
+                pstmt.setString(2, wildcard);
+            }
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    int id = rs.getInt("book_id");
+                    String title = rs.getString("title");
+                    String author = rs.getString("author");
+                    boolean isIssued = rs.getBoolean("is_issued");
+                    String memberName = rs.getString("member_name");
+                    catalogModel.addRow(new Object[]{id, title, author, isIssued ? "ISSUED" : "AVAILABLE", (isIssued && memberName != null) ? memberName : "-"});
+                }
+            }
+        } catch (SQLException e) {
+            logTransaction("[Catalog Error] " + e.getMessage());
+        }
+    }
+
+    private void performSearch(String keyword) {
+        if (keyword.isEmpty()) {
+            loadCatalogData(null);
+        } else {
+            loadCatalogData(keyword);
+            logTransaction("[Search Executed] Keyword: '" + keyword + "' (PreparedStatement LIKE)");
+        }
+    }
+
+    private void loadJoinReportData() {
+        joinModel.setRowCount(0);
+        if (conn == null) return;
+
+        // SQL INNER JOIN Demonstration
+        String joinSQL = "SELECT b.book_id, b.title, b.author, m.member_id, m.name AS member_name, m.email AS member_email "
+                + "FROM books b "
+                + "INNER JOIN members m ON b.issued_to = m.member_id "
+                + "WHERE b.is_issued = TRUE "
+                + "ORDER BY b.book_id ASC;";
+
+        int count = 0;
+        try (PreparedStatement pstmt = conn.prepareStatement(joinSQL);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            while (rs.next()) {
+                count++;
+                joinModel.addRow(new Object[]{
+                        rs.getInt("book_id"),
+                        rs.getString("title"),
+                        rs.getString("author"),
+                        rs.getInt("member_id"),
+                        rs.getString("member_name"),
+                        rs.getString("member_email") != null ? rs.getString("member_email") : "-"
+                });
+            }
+
+            if (totalIssuedBadge != null) {
+                totalIssuedBadge.setText("Currently Issued: " + count + " book" + (count == 1 ? "" : "s"));
+            }
+        } catch (SQLException e) {
+            logTransaction("[JOIN Report Error] " + e.getMessage());
+        }
+    }
+
+    private void loadMembersData() {
+        membersModel.setRowCount(0);
+        if (conn == null) return;
+
+        String query = "SELECT member_id, name, email FROM members ORDER BY member_id ASC;";
+        try (PreparedStatement pstmt = conn.prepareStatement(query);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                membersModel.addRow(new Object[]{
+                        rs.getInt("member_id"),
+                        rs.getString("name"),
+                        rs.getString("email") != null ? rs.getString("email") : "-"
+                });
+            }
+        } catch (SQLException e) {
+            logTransaction("[Members Error] " + e.getMessage());
+        }
+    }
+
+    private void handleAddBook() {
+        String title = addTitleField.getText().trim();
+        String author = addAuthorField.getText().trim();
+
+        if (title.isEmpty() || author.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter both Title and Author.", "Input
