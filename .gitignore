@@ -1,0 +1,18 @@
+# Compiled output — run.bat rebuilds this fresh every time
+out/
+
+# Local runtime data — regenerates automatically on first launch
+factory.db
+crash.log
+
+# Google OAuth client secret — DO NOT COMMIT.
+# If you fork/share this repo, each dev should supply their own copy
+# (see Google Cloud Console → APIs & Services → Credentials).
+google_credentials.json
+
+# OS/editor noise
+.vscode/
+.idea/
+*.iml
+Thumbs.db
+.DS_Store
