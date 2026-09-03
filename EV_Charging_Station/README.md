@@ -10,30 +10,24 @@ A comprehensive, multithreaded Java Desktop application featuring **Swing GUI**,
 
 ## 🎨 Design System & Color Palette
 
-The user interface follows a modern, accessible, and high-contrast color scheme:
+The user interface features a modern dark theme inspired by modern developer tooling:
 
 | Role / Element | Color Name | HEX Code | RGB |
 |---|---|---|---|
-| **Presentation Background** | Pale Lavender Tint | #E2DCF0 | 
-gb(226, 220, 240) |
-| **Hero Left Background (Website / Form)** | Crisp Off-White / Lilac Fog | #F7F6FC | 
-gb(247, 246, 252) |
-| **Split Section Right Background** | Electric Royal Indigo | #4B2DB3 | 
-gb(75, 45, 179) |
-| **Headphones / Hardware Accent** | Deep Metallic Violet | #4D1774 | 
-gb(77, 23, 116) |
-| **Primary Headline Text** | Midnight Charcoal | #1F192F | 
-gb(31, 25, 47) |
-| **Body / Descriptive Text** | Dusty Slate Lavender | #766E87 | 
-gb(118, 110, 135) |
-| **Primary CTA Button (Gradient Start)** | Coral Rose Gradient Start | #F85A68 | 
-gb(248, 90, 104) |
-| **CTA Button Gradient End** | Orchid Pink | #E33F7C | 
-gb(227, 63, 124) |
-| **Audio Waveform / Watermark Graphic** | Pale Violet Mist | #DDD7EA | 
-gb(221, 215, 234) |
-| **CTA Text & Contrasting Accents** | Pure White | #FFFFFF | 
-gb(255, 255, 255) |
+| **Primary Header & Footer** | Deep Slate | #0F172A | 
+gb(15, 23, 42) |
+| **Text White / Highlights** | Pure White Mist | #F8FAFC | 
+gb(248, 250, 252) |
+| **Body / Main Background** | Dark Slate Panel | #1E293B | 
+gb(30, 41, 59) |
+| **Output / Console Box** | Slate Console | #334155 | 
+gb(51, 65, 85) |
+| **Text & Field Labels** | Soft Slate Lavender | #E2E8F0 | 
+gb(226, 232, 240) |
+| **Book Slot Action Button** | Cyan / Sky Blue | #0EA5E9 | 
+gb(14, 165, 233) |
+| **Bill & Navigation Action Buttons** | Royal Indigo | #6366F1 | 
+gb(99, 102, 241) |
 
 ---
 

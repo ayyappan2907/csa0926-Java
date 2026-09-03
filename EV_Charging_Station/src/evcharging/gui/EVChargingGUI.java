@@ -12,20 +12,22 @@ import java.util.List;
 
 /**
  * Styled Swing GUI for EV Charging Station Booking.
- * Colour palette: SIMATS Electric Indigo / Coral Rose theme.
+ * Modern Dark Slate Theme with Cyan and Indigo Accents.
  */
 public class EVChargingGUI extends JFrame {
 
-    private static final Color C_BG       = new Color(226, 220, 240);
-    private static final Color C_PANEL    = new Color(247, 246, 252);
-    private static final Color C_INDIGO   = new Color(75,  45,  179);
-    private static final Color C_VIOLET   = new Color(77,  23,  116);
-    private static final Color C_HEADLINE = new Color(31,  25,   47);
-    private static final Color C_BODY     = new Color(118, 110, 135);
-    private static final Color C_CORAL    = new Color(248,  90, 104);
-    private static final Color C_ORCHID   = new Color(227,  63, 124);
-    private static final Color C_MIST     = new Color(221, 215, 234);
-    private static final Color C_WHITE    = Color.WHITE;
+    // Primary Header & Footer
+    private static final Color primaryDark  = new Color(15, 23, 42);    // #0F172A (Deep Slate)
+    private static final Color textWhite    = new Color(248, 250, 252); // #F8FAFC
+
+    // Backgrounds
+    private static final Color bodyBg       = new Color(30, 41, 59);    // #1E293B (Dark Slate Panel)
+    private static final Color outputBg     = new Color(51, 65, 85);    // #334155 (Console Box)
+    private static final Color textColor    = new Color(226, 232, 240); // #E2E8F0 (Text/Labels)
+
+    // Action Buttons
+    private static final Color bookBtnColor = new Color(14, 165, 233);  // #0EA5E9 (Cyan/Sky Blue)
+    private static final Color billBtnColor = new Color(99, 102, 241);  // #6366F1 (Indigo)
 
     private static final Font F_TITLE = new Font("SansSerif", Font.BOLD,  20);
     private static final Font F_SUB   = new Font("SansSerif", Font.BOLD,  13);
@@ -49,7 +51,7 @@ public class EVChargingGUI extends JFrame {
         setMinimumSize(new Dimension(700, 540));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        getContentPane().setBackground(C_BG);
+        getContentPane().setBackground(bodyBg);
         buildUI();
     }
 
@@ -64,8 +66,11 @@ public class EVChargingGUI extends JFrame {
         JPanel header = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
-                g2.setPaint(new GradientPaint(0, 0, C_VIOLET, getWidth(), 0, C_INDIGO));
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(primaryDark);
                 g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setColor(outputBg);
+                g2.drawLine(0, getHeight() - 1, getWidth(), getHeight() - 1);
             }
         };
         header.setOpaque(false);
@@ -74,17 +79,17 @@ public class EVChargingGUI extends JFrame {
 
         JLabel icon = new JLabel("EV");
         icon.setFont(new Font("SansSerif", Font.BOLD, 28));
-        icon.setForeground(C_CORAL);
+        icon.setForeground(bookBtnColor);
         icon.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 12));
 
         JPanel textBox = new JPanel(new GridLayout(2, 1, 0, 2));
         textBox.setOpaque(false);
         JLabel title = new JLabel("EV Charging Station Slot Booking & Billing");
         title.setFont(F_TITLE);
-        title.setForeground(C_WHITE);
+        title.setForeground(textWhite);
         JLabel sub = new JLabel("SIMATS Engineering  |  CSA0926 Java Programming");
         sub.setFont(F_SMALL);
-        sub.setForeground(new Color(200, 195, 230));
+        sub.setForeground(textColor);
         textBox.add(title);
         textBox.add(sub);
 
@@ -103,14 +108,14 @@ public class EVChargingGUI extends JFrame {
         split.setResizeWeight(0.45);
         split.setBorder(null);
         split.setDividerSize(4);
-        split.setBackground(C_BG);
+        split.setBackground(bodyBg);
         return split;
     }
 
     private JScrollPane buildFormPanel() {
         JPanel form = new JPanel();
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-        form.setBackground(C_BG);
+        form.setBackground(bodyBg);
         form.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 8));
 
         form.add(sectionLabel("Customer Details"));
@@ -152,10 +157,10 @@ public class EVChargingGUI extends JFrame {
 
         form.add(Box.createVerticalStrut(18));
 
-        JButton bookBtn  = gradientButton("Book Slot",       C_CORAL,  C_ORCHID);
-        JButton showBtn  = indigoButton("Show Stations");
-        JButton billBtn  = indigoButton("Calculate Bill");
-        JButton clearBtn = ghostButton("Clear Output");
+        JButton bookBtn  = styledButton("Book Slot",       bookBtnColor, textWhite);
+        JButton showBtn  = styledButton("Show Stations",   billBtnColor, textWhite);
+        JButton billBtn  = styledButton("Calculate Bill",  billBtnColor, textWhite);
+        JButton clearBtn = styledButton("Clear Output",    outputBg,     textColor);
 
         bookBtn.addActionListener(e  -> handleBook());
         showBtn.addActionListener(e  -> handleShowStations());
@@ -174,13 +179,13 @@ public class EVChargingGUI extends JFrame {
 
         JScrollPane sp = new JScrollPane(form);
         sp.setBorder(null);
-        sp.getViewport().setBackground(C_BG);
+        sp.getViewport().setBackground(bodyBg);
         return sp;
     }
 
     private JPanel buildOutputPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(C_BG);
+        panel.setBackground(bodyBg);
         panel.setBorder(BorderFactory.createEmptyBorder(16, 8, 16, 16));
 
         panel.add(sectionLabel("System Output"), BorderLayout.NORTH);
@@ -188,8 +193,9 @@ public class EVChargingGUI extends JFrame {
         outputArea = new JTextArea();
         outputArea.setEditable(false);
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        outputArea.setBackground(C_MIST);
-        outputArea.setForeground(C_HEADLINE);
+        outputArea.setBackground(outputBg);
+        outputArea.setForeground(textColor);
+        outputArea.setCaretColor(textWhite);
         outputArea.setLineWrap(true);
         outputArea.setWrapStyleWord(true);
         outputArea.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -198,22 +204,25 @@ public class EVChargingGUI extends JFrame {
                            "Fill in the form and click Book Slot.\n");
 
         JScrollPane sp = new JScrollPane(outputArea);
-        sp.setBorder(new LineBorder(C_MIST, 1, true));
+        sp.setBorder(new LineBorder(outputBg.brighter(), 1, true));
         panel.add(sp, BorderLayout.CENTER);
         return panel;
     }
 
     private JPanel buildFooter() {
         JPanel footer = new JPanel(new BorderLayout());
-        footer.setBackground(C_INDIGO);
+        footer.setBackground(primaryDark);
         footer.setPreferredSize(new Dimension(0, 28));
-        footer.setBorder(BorderFactory.createEmptyBorder(4, 16, 4, 16));
+        footer.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, outputBg),
+            BorderFactory.createEmptyBorder(4, 16, 4, 16)
+        ));
         JLabel status = new JLabel("SIMATS Engineering  |  EV Charging System  |  Java Assignment");
-        status.setForeground(new Color(200, 195, 230));
+        status.setForeground(textColor);
         status.setFont(F_SMALL);
         footer.add(status, BorderLayout.WEST);
         JLabel date = new JLabel(LocalDate.now().toString());
-        date.setForeground(new Color(200, 195, 230));
+        date.setForeground(textColor);
         date.setFont(F_SMALL);
         footer.add(date, BorderLayout.EAST);
         return footer;
@@ -356,10 +365,10 @@ public class EVChargingGUI extends JFrame {
     private JLabel sectionLabel(String text) {
         JLabel lbl = new JLabel(text);
         lbl.setFont(F_SUB);
-        lbl.setForeground(C_INDIGO);
+        lbl.setForeground(bookBtnColor);
         lbl.setAlignmentX(LEFT_ALIGNMENT);
-        lbl.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, C_MIST));
-        lbl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        lbl.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, outputBg));
+        lbl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
         return lbl;
     }
 
@@ -369,7 +378,7 @@ public class EVChargingGUI extends JFrame {
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
         JLabel lbl = new JLabel(labelText);
         lbl.setFont(F_BODY);
-        lbl.setForeground(C_BODY);
+        lbl.setForeground(textColor);
         lbl.setPreferredSize(new Dimension(120, 28));
         row.add(lbl, BorderLayout.WEST);
         row.add(field, BorderLayout.CENTER);
@@ -379,80 +388,43 @@ public class EVChargingGUI extends JFrame {
     private JTextField styledField(String placeholder) {
         JTextField tf = new JTextField();
         tf.setFont(F_BODY);
-        tf.setForeground(C_HEADLINE);
-        tf.setBackground(C_PANEL);
+        tf.setForeground(textWhite);
+        tf.setCaretColor(textWhite);
+        tf.setBackground(outputBg);
         tf.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(C_MIST, 1, true),
-            BorderFactory.createEmptyBorder(4, 8, 4, 8)));
+            new LineBorder(outputBg.brighter(), 1, true),
+            BorderFactory.createEmptyBorder(5, 10, 5, 10)));
         tf.setToolTipText(placeholder);
         return tf;
     }
 
     private void styleCombo(JComboBox<?> box) {
         box.setFont(F_BODY);
-        box.setBackground(C_PANEL);
-        box.setForeground(C_HEADLINE);
-        box.setBorder(new LineBorder(C_MIST, 1, true));
+        box.setBackground(outputBg);
+        box.setForeground(textWhite);
+        box.setBorder(new LineBorder(outputBg.brighter(), 1, true));
     }
 
-    private JButton gradientButton(String text, Color c1, Color c2) {
+    private JButton styledButton(String text, Color bg, Color fg) {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                                     RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setPaint(new GradientPaint(0, 0, c1, getWidth(), 0, c2));
+                if (getModel().isPressed()) {
+                    g2.setColor(bg.darker());
+                } else if (getModel().isRollover()) {
+                    g2.setColor(bg.brighter());
+                } else {
+                    g2.setColor(bg);
+                }
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        btn.setForeground(C_WHITE);
+        btn.setForeground(fg);
         btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setOpaque(false);
-        return btn;
-    }
-
-    private JButton indigoButton(String text) {
-        JButton btn = new JButton(text) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                                    RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(C_INDIGO);
-                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        btn.setForeground(C_WHITE);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setContentAreaFilled(false);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setOpaque(false);
-        return btn;
-    }
-
-    private JButton ghostButton(String text) {
-        JButton btn = new JButton(text) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                                    RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(C_MIST);
-                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        btn.setForeground(C_BODY);
-        btn.setFont(F_BODY);
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
